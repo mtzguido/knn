@@ -6,6 +6,7 @@
 #include <math.h>
 #include <getopt.h>
 #include <errno.h>
+#include <time.h>
 
 #define warn(s, ...)		\
 	fprintf(stderr, "%s.%i: " s, __func__, __LINE__ , ##__VA_ARGS__); \
@@ -340,6 +341,15 @@ int do_predicts(double *_err, int K, int rows, double **m, char *fname)
 	return 0;
 }
 
+static void start_rand()
+{
+	struct timespec tp;
+
+	clock_gettime(CLOCK_REALTIME, &tp);
+
+	srand(tp.tv_sec * 1000 + tp.tv_nsec / 1000000);
+}
+
 int main(int argc, char **argv)
 {
 	double **d;
@@ -352,6 +362,8 @@ int main(int argc, char **argv)
 	double minErr = HUGE_VAL;
 	int bestK = -1;
 	int k;
+
+	start_rand();
 
 	if (argc < 2)
 		fail("uso: %s <archivo>\n", argv[0]);
