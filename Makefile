@@ -13,9 +13,9 @@ install: knn
 
 test_%: knn
 	./knn "$(patsubst test_%,%,$@)"
-	gnuplot -e 'IN="$(patsubst test_%,%,$@).in"' plot
-	gnuplot -e 'IN="$(patsubst test_%,%,$@).test"' plot
-	gnuplot -e 'IN="$(patsubst test_%,%,$@).predic"' plot
+	gnuplot -e 'IN="$(patsubst test_%,%,$@).in"' plot_$(patsubst test_%,%,$@)
+	gnuplot -e 'IN="$(patsubst test_%,%,$@).test"' plot_$(patsubst test_%,%,$@)
+	gnuplot -e 'IN="$(patsubst test_%,%,$@).predic"' plot_$(patsubst test_%,%,$@)
 
 test: knn test_a test_b test_c
 
