@@ -3,6 +3,8 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <stdbool.h>
+#include <assert.h>
 #include <math.h>
 #include <getopt.h>
 #include <errno.h>
@@ -145,7 +147,49 @@ static void show_cfg()
 	printf("Validation patterns = %i\n", cfg.valid_patterns);
 }
 
+double modulus(double *vec, int len)
+{
+	double ret;
+	int i;
+
+	ret = 0;
+
+	for (i = 0; i < len; i++)
+		ret += (vec[i] - 1) * (vec[i] - 1);
+
+	return ret;
+}
+
+double dist2(int len, double *v1, double *v2)
+{
+	double ret;
+	int i;
+
+	ret = 0;
+
+	for (i = 0; i < len; i++)
+		ret += (v1[i] - v2[i])*(v1[i] - v2[i]);
+
+	return ret;
+}
+
 double **train_data;
+double *origin_dists;
+
+int train(double **d, int pats, int inputs)
+{
+	int i;
+	train_data = d;
+
+	origin_dists = malloc(sizeof(double) * pats);
+	if (!origin_dists)
+		fail("OOM origin_dists\n");
+
+	for (i = 0; i < pats; i++)
+		origin_dists[i] = sqrt(modulus(d[i], inputs));
+
+	return 0;
+}
 
 int read_csv(FILE *f, int rows, int cols, double **mat)
 {
@@ -237,19 +281,6 @@ int shuffle(double **m, int rows, int cols)
 	return 0;
 }
 
-double dist2(int len, double *v1, double *v2)
-{
-	double ret;
-	int i;
-
-	ret = 0;
-
-	for (i = 0; i < len; i++)
-		ret += (v1[i] - v2[i])*(v1[i] - v2[i]);
-
-	return ret;
-}
-
 double dist(int len, double *v1, double *v2)
 {
 	return sqrt(dist2(len, v1, v2));
@@ -260,6 +291,7 @@ int predict_one(int K, double *vec, int len)
 	int *nearest = alloca(sizeof(int) * (K + 1));
 	double *dists = alloca(sizeof(double) * (K + 1));
 	double *closest_dists = alloca(sizeof(double) * (cfg.classes));
+	double odist = sqrt(modulus(vec, len));
 	int i, j;
 	int c_max = -1, c_count;
 	int c, t;
@@ -269,6 +301,13 @@ int predict_one(int K, double *vec, int len)
 
 	for (i = 0; i < cfg.train_patterns; i++) {
 		double d;
+		double t;
+
+		t = origin_dists[i] - odist;
+		t *= t;
+
+		if (t > dists[K-1])
+			continue;
 
 		d = dist2(len, vec, train_data[i]);
 
@@ -390,7 +429,9 @@ int main(int argc, char **argv)
 	if (ret)
 		fail("shuffle failed (%i)\n", ret);
 
-	train_data = d;
+	ret = train(d, cfg.patterns, cfg.inputs);
+	if (ret)
+		fail("train failed (%i)\n", ret);
 
 	ret = read_data_file(stem, "test", &t, cfg.tests);
 	if (ret)
