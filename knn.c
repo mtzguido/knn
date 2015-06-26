@@ -96,8 +96,10 @@ static void parse_opts(int argc, char **argv)
 static void sort_opts(int argc, char **argv)
 {
 	int c, idx;
-	while (c = getopt_long(argc, argv, "", long_options, &idx), c != -1)
-		;
+	while (c = getopt_long(argc, argv, "", long_options, &idx), c != -1) {
+		if (c == '?')
+			fail("usage....\n");
+	}
 }
 
 static char lookup_cfg(char *key)
