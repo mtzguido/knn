@@ -3,13 +3,13 @@
 all: knn
 
 %: %.c
-	gcc -g -Wall -O99 $< -lm -o $@
+	gcc -Wall -O99 $< -lm -o $@
 
 clean:
 	rm -f knn
 
 install: knn
-	cp knn /usr/local/bin/
+	install -m 0755  knn /usr/local/bin/knn
 
 test_%: knn
 	./knn "$(patsubst test_%,%,$@)"
