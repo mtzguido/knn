@@ -7,6 +7,7 @@
 #include <getopt.h>
 #include <errno.h>
 #include <time.h>
+#include <stdbool.h>
 
 #define warn(s, ...)		\
 	fprintf(stderr, "%s.%i: " s, __func__, __LINE__ , ##__VA_ARGS__); \
@@ -28,6 +29,9 @@ struct cfg {
 
 	int minK;
 	int maxK;
+
+	bool ball;
+	double minD, maxD, step;
 
 	/* Not configurable, calculated in base of others */
 	int train_patterns;	/* How many patterns are used for training
@@ -359,51 +363,12 @@ static void start_rand()
 	srand(tp.tv_sec * 1000 + tp.tv_nsec / 1000000);
 }
 
-int main(int argc, char **argv)
+int do_knn(double **d, double **t, char *stem)
 {
-	double **d;
-	double **t;
-	char stem[80];
-	int ret;
-	double err;
+	double err, minErr = HUGE_VAL;
 	char predic_file[80];
-
-	double minErr = HUGE_VAL;
 	int bestK = -1;
 	int k;
-
-	start_rand();
-
-	if (argc < 2)
-		fail("uso: %s <archivo>\n", argv[0]);
-
-	/* UGH */
-	sort_opts(argc, argv);
-
-	/* Borrar .in al final si existe */
-	strcpy(stem, argv[optind]);
-	if (!strcmp(stem + strlen(stem) - 3, ".in"))
-		stem[strlen(stem) - 3] = 0;
-
-	read_cfg(stem);
-
-	parse_opts(argc, argv);
-
-	show_cfg();
-
-	ret = read_data_file(stem, "in", &d, cfg.patterns);
-	if (ret)
-		fail("read_data failed (%i)\n", ret);
-
-	ret = shuffle(d, cfg.patterns, cfg.inputs + 1);
-	if (ret)
-		fail("shuffle failed (%i)\n", ret);
-
-	train_data = d;
-
-	ret = read_data_file(stem, "test", &t, cfg.tests);
-	if (ret)
-		fail("read_test failed (%i)\n", ret);
 
 	if (cfg.minK != cfg.maxK) {
 		if (cfg.maxK > cfg.train_patterns) {
@@ -442,6 +407,54 @@ int main(int argc, char **argv)
 
 	do_predicts(&err, bestK, cfg.tests, t, predic_file);
 	printf("Error sobre TEST:	%lf\n", err);
+
+	return 0;
+}
+
+int main(int argc, char **argv)
+{
+	double **d;
+	double **t;
+	char stem[80];
+	int ret;
+
+	start_rand();
+
+	if (argc < 2)
+		fail("uso: %s <archivo>\n", argv[0]);
+
+	/* UGH */
+	sort_opts(argc, argv);
+
+	/* Borrar .in al final si existe */
+	strcpy(stem, argv[optind]);
+	if (!strcmp(stem + strlen(stem) - 3, ".in"))
+		stem[strlen(stem) - 3] = 0;
+
+	read_cfg(stem);
+
+	parse_opts(argc, argv);
+
+	show_cfg();
+
+	ret = read_data_file(stem, "in", &d, cfg.patterns);
+	if (ret)
+		fail("read_data failed (%i)\n", ret);
+
+	ret = shuffle(d, cfg.patterns, cfg.inputs + 1);
+	if (ret)
+		fail("shuffle failed (%i)\n", ret);
+
+	train_data = d;
+
+	ret = read_data_file(stem, "test", &t, cfg.tests);
+	if (ret)
+		fail("read_test failed (%i)\n", ret);
+
+	if (cfg.ball) {
+	} else {
+		do_knn(d, t, stem);
+	}
 
 	return 0;
 }
