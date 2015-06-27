@@ -52,6 +52,8 @@ static const struct option long_options[] = {
 	{"seed",	required_argument, 0, 's'},
 	{"split",	required_argument, 0, 'v'},
 	{"k",		required_argument, 0, 'k'},
+	{"ball",	no_argument,       0, 'b'},
+	{"d",		required_argument, 0, 'd'},
 };
 
 static void set_opt(char c, char *arg)
@@ -79,6 +81,14 @@ static void set_opt(char c, char *arg)
 	case 'k':
 		if (2 != sscanf(arg, "%i..%i", &cfg.minK, &cfg.maxK))
 			fail("Invalid interval for K\n");
+		break;
+	case 'b':
+		cfg.ball = true;
+		break;
+	case 'd':
+		if (3 != sscanf(arg, "%lf..%lf..%lf", &cfg.minD, &cfg.step,
+						      &cfg.maxD))
+			fail("Invalid interval for D\n");
 		break;
 	case '?':
 		fail("usage....\n");
@@ -324,6 +334,47 @@ int predict_one(int K, double *vec, int len)
 	return c_max;
 }
 
+int predict_one_ball(double D, double *vec, int len)
+{
+	double *closest_dists = alloca(sizeof(double) * cfg.classes);
+	int *count = alloca(sizeof(int) * cfg.classes);
+	int winner;
+	int c, i;
+
+	for (i = 0; i < cfg.classes; i++) {
+		count[i] = 0;
+		closest_dists[i] = HUGE_VAL;
+	}
+
+	for (i = 0; i < cfg.train_patterns; i++) {
+		double d;
+		int c;
+
+		d = dist2(len, vec, train_data[i]);
+		c = train_data[i][cfg.inputs];
+
+		if (d <= D * D)
+			count[c]++;
+
+		if (d < closest_dists[c])
+			closest_dists[c] = d;
+	}
+
+	winner = 0;
+	for (c = 1; c < cfg.classes; c++) {
+		/*
+		 * Buscar la clase con mas "votos", en caso de empate
+		 * usar vecino mas cercano (incluso si no entraba en la bola)
+		 */
+		if (count[c] > count[winner] ||
+				(count[c] == count[winner] &&
+				 closest_dists[c] < closest_dists[winner]))
+			winner = c;
+	}
+
+	return winner;
+}
+
 int do_predicts(double *_err, int K, int rows, double **m, char *fname)
 {
 	int i, c;
@@ -338,6 +389,36 @@ int do_predicts(double *_err, int K, int rows, double **m, char *fname)
 
 	for (i = 0; i < rows; i++) {
 		c = predict_one(K, m[i], cfg.inputs);
+
+		if (c != m[i][cfg.inputs])
+			err++;
+
+		for (a = 0; a < cfg.inputs; a++)
+			fprintf(f, "%lf,", m[i][a]);
+		fprintf(f, "%i\n", c);
+	}
+
+	err /= rows;
+
+	*_err = err;
+
+	return 0;
+}
+
+int do_predicts_ball(double *_err, double D, int rows, double **m, char *fname)
+{
+	int i, c;
+	double err = 0;
+	FILE *f;
+	int a;
+
+	if (fname)
+		f = fopen(fname, "w");
+	else
+		f = fopen("/dev/null", "w");
+
+	for (i = 0; i < rows; i++) {
+		c = predict_one_ball(D, m[i], cfg.inputs);
 
 		if (c != m[i][cfg.inputs])
 			err++;
@@ -411,6 +492,47 @@ int do_knn(double **d, double **t, char *stem)
 	return 0;
 }
 
+int do_ball(double **d, double **t, char *stem)
+{
+	double err, minErr = HUGE_VAL;
+	char predic_file[80];
+	double bestD = 0;
+	int k;
+	double D;
+
+	for (D = cfg.minD; D <= cfg.maxD; D += cfg.step) {
+		if (cfg.cv_split == 0)
+			fail("Cannot optimize D with validation split = 0\n");
+
+		for (k = cfg.minK; k <= cfg.maxK; k++) {
+			do_predicts_ball(&err, D, cfg.valid_patterns,
+					d + cfg.train_patterns, NULL);
+
+			if (err < minErr) {
+				minErr = err;
+				bestD = D;
+			}
+		}
+
+	}
+	printf("best D = %f\n", bestD);
+
+	do_predicts_ball(&err, bestD, cfg.train_patterns, d, NULL);
+	printf("Error sobre TRAIN:	%lf\n", err);
+
+	if (cfg.cv_split > 0) {
+		do_predicts_ball(&err, bestD, cfg.valid_patterns, d + cfg.train_patterns, NULL);
+		printf("Error sobre VALID:	%lf\n", err);
+	}
+
+	sprintf(predic_file, "%s.predic", stem);
+
+	do_predicts_ball(&err, bestD, cfg.tests, t, predic_file);
+	printf("Error sobre TEST:	%lf\n", err);
+
+	return 0;
+}
+
 int main(int argc, char **argv)
 {
 	double **d;
@@ -451,10 +573,10 @@ int main(int argc, char **argv)
 	if (ret)
 		fail("read_test failed (%i)\n", ret);
 
-	if (cfg.ball) {
-	} else {
-		do_knn(d, t, stem);
-	}
+	if (cfg.ball)
+		return do_ball(d, t, stem);
+	else
+		return do_knn(d, t, stem);
 
 	return 0;
 }
