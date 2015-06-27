@@ -360,6 +360,7 @@ int do_predicts(double *_err, int K, int rows, double **m, char *fname)
 	int i, c;
 	double err = 0;
 	FILE *f;
+	int a;
 
 	if (fname)
 		f = fopen(fname, "w");
@@ -372,7 +373,9 @@ int do_predicts(double *_err, int K, int rows, double **m, char *fname)
 		if (c != m[i][cfg.inputs])
 			err++;
 
-		fprintf(f, "%lf,%lf,%i\n", m[i][0], m[i][1], c);
+		for (a = 0; a < cfg.inputs; a++)
+			fprintf(f, "%lf,", m[i][a]);
+		fprintf(f, "%i\n", c);
 	}
 
 	err /= rows;
