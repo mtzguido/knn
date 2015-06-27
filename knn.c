@@ -305,6 +305,10 @@ int predict_one(int K, double *vec, int len)
 			}
 		}
 
+		/*
+		 * Si hay un empate, tomamos la clase que haya tenido
+		 * su vecino mas cercano a menor distancia
+		 */
 		if (t > c_count ||
 			(t == c_count
 				 && closest_dists[c] < closest_dists[c_max])) {
